@@ -1,1 +1,153 @@
+-- ============================================================
+-- 8 Week SQL Challenge — Case Study #1: Danny's Diner
+-- Solutions: Q1 to Q5
+-- ============================================================
 
+
+-- ─────────────────────────────────────────────────────────────
+-- Q1. What is the total amount each customer spent at the restaurant?
+-- ─────────────────────────────────────────────────────────────
+-- Tư duy:
+--   - Cần tổng tiền theo từng khách → SUM + GROUP BY customer_id
+--   - Bảng sales không có price → INNER JOIN với menu qua product_id
+
+SELECT
+    sales.customer_id,
+    SUM(menu.price) AS total_amount
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu
+    ON sales.product_id = menu.product_id
+GROUP BY sales.customer_id
+ORDER BY sales.customer_id ASC;
+
+-- Result:
+-- customer_id | total_amount
+-- ------------|-------------
+-- A           | 76
+-- B           | 74
+-- C           | 36
+
+
+-- ─────────────────────────────────────────────────────────────
+-- Q2. How many days has each customer visited the restaurant?
+-- ─────────────────────────────────────────────────────────────
+-- Tư duy:
+--   - Hỏi số NGÀY, không phải số lần mua → COUNT(DISTINCT order_date)
+--   - Nếu dùng COUNT thường: mua 2 món cùng ngày bị đếm thành 2 → sai
+
+SELECT
+    sales.customer_id,
+    COUNT(DISTINCT sales.order_date) AS total_days_visited
+FROM dannys_diner.sales
+GROUP BY sales.customer_id
+ORDER BY sales.customer_id ASC;
+
+-- Result:
+-- customer_id | total_days_visited
+-- ------------|-------------------
+-- A           | 4
+-- B           | 6
+-- C           | 2
+
+
+-- ─────────────────────────────────────────────────────────────
+-- Q3. What was the first item from the menu purchased by each customer?
+-- ─────────────────────────────────────────────────────────────
+-- Tư duy:
+--   - "Đầu tiên" = order_date sớm nhất → cần đánh rank theo ngày
+--   - DENSE_RANK vì cùng ngày mua 2 món → cả 2 đều là "đầu tiên"
+--   - Cần CTE vì WHERE rank = 1 phải chạy sau khi rank đã được tính
+--   - DISTINCT để tránh trùng nếu cùng ngày mua cùng món 2 lần
+
+WITH ordered_sales AS (
+    SELECT
+        sales.customer_id,
+        sales.order_date,
+        menu.product_name,
+        DENSE_RANK() OVER (
+            PARTITION BY sales.customer_id
+            ORDER BY sales.order_date
+        ) AS rank
+    FROM dannys_diner.sales
+    INNER JOIN dannys_diner.menu
+        ON sales.product_id = menu.product_id
+)
+SELECT DISTINCT
+    customer_id,
+    product_name
+FROM ordered_sales
+WHERE rank = 1
+ORDER BY customer_id ASC;
+
+-- Result:
+-- customer_id | product_name
+-- ------------|-------------
+-- A           | curry
+-- A           | sushi
+-- B           | curry
+-- C           | ramen
+
+
+-- ─────────────────────────────────────────────────────────────
+-- Q4. What is the most purchased item on the menu and how many
+--     times was it purchased by all customers?
+-- ─────────────────────────────────────────────────────────────
+-- Tư duy:
+--   - Đếm số lần mỗi món được mua → COUNT + GROUP BY product_name
+--   - Lấy món nhiều nhất → ORDER BY DESC + LIMIT 1
+
+SELECT
+    menu.product_name,
+    COUNT(sales.product_id) AS total_purchased
+FROM dannys_diner.sales
+INNER JOIN dannys_diner.menu
+    ON sales.product_id = menu.product_id
+GROUP BY menu.product_name
+ORDER BY total_purchased DESC
+LIMIT 1;
+
+-- Result:
+-- product_name | total_purchased
+-- -------------|----------------
+-- ramen        | 8
+
+
+-- ─────────────────────────────────────────────────────────────
+-- Q5. Which item was the most popular for each customer?
+-- ─────────────────────────────────────────────────────────────
+-- Tư duy:
+--   - "Phổ biến nhất với TỪNG khách" → đếm số lần mua per customer per item
+--   - Lấy item có count cao nhất của mỗi khách → DENSE_RANK + CTE
+--   - DENSE_RANK vì 1 khách có thể mua 2 món bằng nhau → giữ cả 2
+--   - PARTITION BY customer_id → rank riêng cho từng khách
+
+WITH most_popular AS (
+    SELECT
+        sales.customer_id,
+        menu.product_name,
+        COUNT(sales.product_id) AS order_count,
+        DENSE_RANK() OVER (
+            PARTITION BY sales.customer_id
+            ORDER BY COUNT(sales.product_id) DESC
+        ) AS rank
+    FROM dannys_diner.sales
+    INNER JOIN dannys_diner.menu
+        ON sales.product_id = menu.product_id
+    GROUP BY sales.customer_id, menu.product_name
+)
+SELECT
+    customer_id,
+    product_name,
+    order_count
+FROM most_popular
+WHERE rank = 1
+ORDER BY customer_id ASC;
+
+-- Result:
+-- customer_id | product_name | order_count
+-- ------------|--------------|------------
+-- A           | ramen        | 3
+-- B           | ramen        | 2
+-- B           | curry        | 2
+-- B           | sushi        | 2
+-- C           | ramen        | 3
