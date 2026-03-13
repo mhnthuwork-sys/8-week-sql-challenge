@@ -1,15 +1,16 @@
--- ============================================================
--- 8 Week SQL Challenge — Case Study #1: Danny's Diner
--- ============================================================
+# 🍜 Case Study #1 - Danny's Diner
+## Solution
 
+### Tables Used
+- **sales** — customer_id, order_date, product_id
+- **menu** — product_id, product_name, price
+- **members** — customer_id, join_date
 
--- ─────────────────────────────────────────────────────────────
--- Q1. What is the total amount each customer spent at the restaurant?
--- ─────────────────────────────────────────────────────────────
--- Tư duy:
---   - Cần tổng tiền theo từng khách → SUM + GROUP BY customer_id
---   - Bảng sales không có price → INNER JOIN với menu qua product_id
+---
 
+## Q1. What is the total amount each customer spent at the restaurant?
+
+```sql
 SELECT
     sales.customer_id,
     SUM(menu.price) AS total_amount
@@ -18,46 +19,55 @@ INNER JOIN dannys_diner.menu
     ON sales.product_id = menu.product_id
 GROUP BY sales.customer_id
 ORDER BY sales.customer_id ASC;
+```
 
--- Result:
--- customer_id | total_amount
--- ------------|-------------
--- A           | 76
--- B           | 74
--- C           | 36
+**Steps:**
+- Use **JOIN** to merge `dannys_diner.sales` and `dannys_diner.menu` tables as `sales.customer_id` and `menu.price` are from both tables.
+- Use **SUM** to calculate the total amount spent by each customer.
+- Group the aggregated results by `sales.customer_id`.
 
+**Result:**
 
--- ─────────────────────────────────────────────────────────────
--- Q2. How many days has each customer visited the restaurant?
--- ─────────────────────────────────────────────────────────────
--- Tư duy:
---   - Hỏi số NGÀY, không phải số lần mua → COUNT(DISTINCT order_date)
---   - Nếu dùng COUNT thường: mua 2 món cùng ngày bị đếm thành 2 → sai
+| customer_id | total_amount |
+|-------------|-------------|
+| A | $76 |
+| B | $74 |
+| C | $36 |
 
+> 💡 Customer A spent the most ($76), Customer C spent the least ($36).
+
+---
+
+## Q2. How many days has each customer visited the restaurant?
+
+```sql
 SELECT
     sales.customer_id,
     COUNT(DISTINCT sales.order_date) AS total_days_visited
 FROM dannys_diner.sales
 GROUP BY sales.customer_id
 ORDER BY sales.customer_id ASC;
+```
 
--- Result:
--- customer_id | total_days_visited
--- ------------|-------------------
--- A           | 4
--- B           | 6
--- C           | 2
+**Steps:**
+- Use **COUNT(DISTINCT order_date)** to count unique visit days per customer.
+- Using `COUNT` without `DISTINCT` would count duplicate days if a customer ordered multiple items on the same day.
 
+**Result:**
 
--- ─────────────────────────────────────────────────────────────
--- Q3. What was the first item from the menu purchased by each customer?
--- ─────────────────────────────────────────────────────────────
--- Tư duy:
---   - "Đầu tiên" = order_date sớm nhất → cần đánh rank theo ngày
---   - DENSE_RANK vì cùng ngày mua 2 món → cả 2 đều là "đầu tiên"
---   - Cần CTE vì WHERE rank = 1 phải chạy sau khi rank đã được tính
---   - DISTINCT để tránh trùng nếu cùng ngày mua cùng món 2 lần
+| customer_id | total_days_visited |
+|-------------|-------------------|
+| A | 4 |
+| B | 6 |
+| C | 2 |
 
+> 💡 Customer B visited the most days (6) despite spending less than A — more loyal but lower spend per visit.
+
+---
+
+## Q3. What was the first item from the menu purchased by each customer?
+
+```sql
 WITH ordered_sales AS (
     SELECT
         sales.customer_id,
@@ -77,24 +87,31 @@ SELECT DISTINCT
 FROM ordered_sales
 WHERE rank = 1
 ORDER BY customer_id ASC;
+```
 
--- Result:
--- customer_id | product_name
--- ------------|-------------
--- A           | curry
--- A           | sushi
--- B           | curry
--- C           | ramen
+**Steps:**
+- Use a **CTE** to create a temporary table with rankings.
+- Use **DENSE_RANK()** over `PARTITION BY customer_id ORDER BY order_date` to rank each purchase per customer by date.
+- `DENSE_RANK` is used instead of `ROW_NUMBER` because if a customer ordered 2 items on the same day, both should be ranked 1st.
+- Filter `WHERE rank = 1` to get only the first purchase(s).
+- Use `DISTINCT` to avoid duplicates if the same item was ordered twice on the first day.
 
+**Result:**
 
--- ─────────────────────────────────────────────────────────────
--- Q4. What is the most purchased item on the menu and how many
---     times was it purchased by all customers?
--- ─────────────────────────────────────────────────────────────
--- Tư duy:
---   - Đếm số lần mỗi món được mua → COUNT + GROUP BY product_name
---   - Lấy món nhiều nhất → ORDER BY DESC + LIMIT 1
+| customer_id | product_name |
+|-------------|-------------|
+| A | curry |
+| A | sushi |
+| B | curry |
+| C | ramen |
 
+> 💡 Customer A ordered 2 items on their first visit. Curry was the first item for both A and B.
+
+---
+
+## Q4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+
+```sql
 SELECT
     menu.product_name,
     COUNT(sales.product_id) AS total_purchased
@@ -104,22 +121,26 @@ INNER JOIN dannys_diner.menu
 GROUP BY menu.product_name
 ORDER BY total_purchased DESC
 LIMIT 1;
+```
 
--- Result:
--- product_name | total_purchased
--- -------------|----------------
--- ramen        | 8
+**Steps:**
+- Use **COUNT** to count the number of times each item was purchased.
+- Use **JOIN** to get `product_name` from the menu table.
+- Use **ORDER BY DESC** + **LIMIT 1** to return only the most purchased item.
 
+**Result:**
 
--- ─────────────────────────────────────────────────────────────
--- Q5. Which item was the most popular for each customer?
--- ─────────────────────────────────────────────────────────────
--- Tư duy:
---   - "Phổ biến nhất với TỪNG khách" → đếm số lần mua per customer per item
---   - Lấy item có count cao nhất của mỗi khách → DENSE_RANK + CTE
---   - DENSE_RANK vì 1 khách có thể mua 2 món bằng nhau → giữ cả 2
---   - PARTITION BY customer_id → rank riêng cho từng khách
+| product_name | total_purchased |
+|-------------|----------------|
+| ramen | 8 |
 
+> 💡 Ramen is the most purchased item with 8 orders — should be prioritized in promotions.
+
+---
+
+## Q5. Which item was the most popular for each customer?
+
+```sql
 WITH most_popular AS (
     SELECT
         sales.customer_id,
@@ -141,12 +162,34 @@ SELECT
 FROM most_popular
 WHERE rank = 1
 ORDER BY customer_id ASC;
+```
 
--- Result:
--- customer_id | product_name | order_count
--- ------------|--------------|------------
--- A           | ramen        | 3
--- B           | ramen        | 2
--- B           | curry        | 2
--- B           | sushi        | 2
--- C           | ramen        | 3
+**Steps:**
+- Use a **CTE** to calculate order count per customer per item.
+- Use **DENSE_RANK()** over `PARTITION BY customer_id ORDER BY COUNT DESC` to rank items by popularity per customer.
+- `DENSE_RANK` is used so that if a customer ordered 2 items equally, both are returned.
+- Filter `WHERE rank = 1` to get the most popular item(s) per customer.
+
+**Result:**
+
+| customer_id | product_name | order_count |
+|-------------|-------------|-------------|
+| A | ramen | 3 |
+| B | ramen | 2 |
+| B | curry | 2 |
+| B | sushi | 2 |
+| C | ramen | 3 |
+
+> 💡 Ramen is the favourite for A and C. Customer B ordered all 3 items equally — an adventurous eater!
+
+---
+
+## SQL Techniques Used
+
+| Question | Techniques |
+|----------|-----------|
+| Q1 | INNER JOIN, SUM, GROUP BY |
+| Q2 | COUNT(DISTINCT) |
+| Q3 | CTE, DENSE_RANK, PARTITION BY, INNER JOIN |
+| Q4 | COUNT, ORDER BY DESC, LIMIT |
+| Q5 | CTE, DENSE_RANK, PARTITION BY, GROUP BY |
