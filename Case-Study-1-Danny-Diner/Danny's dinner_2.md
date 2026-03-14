@@ -1,8 +1,6 @@
 # 🍜 Case Study #1 - Danny's Diner
 ## Solution — Q6 to Q10
 
-> These questions involve the `members` table which tracks when customers joined the loyalty program.
-
 ### Tables Used
 - **sales** — customer_id, order_date, product_id
 - **menu** — product_id, product_name, price
