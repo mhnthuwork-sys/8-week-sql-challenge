@@ -1,20 +1,4 @@
 # 🥑 Case Study #3 - Foodie-Fi
-## Full SQL Solution
-
-> **Source:** [8 Week SQL Challenge - Case Study #3](https://8weeksqlchallenge.com/case-study-3/)  
-> **Dialect:** PostgreSQL  
-> **Schema:** `foodie_fi`
-
----
-
-## Tables Overview
-
-| Table | Description |
-|-------|-------------|
-| `plans` | plan_id, plan_name, price — 5 plans: trial, basic monthly, pro monthly, pro annual, churn |
-| `subscriptions` | customer_id, plan_id, start_date — tracks every plan change per customer |
-
----
 
 ## A. Customer Journey
 
